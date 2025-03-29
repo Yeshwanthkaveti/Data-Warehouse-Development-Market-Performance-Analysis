@@ -1,0 +1,222 @@
+-- Building the data warehouse with SQL Server, including ETL, data modeling, and analytics --
+
+-- Creating the Database 'Datawarehouse'
+CREATE DATABASE Datawarehouse;
+USE Datawarehouse;
+GO
+
+-- Creating schemas
+CREATE SCHEMA bronze;
+GO
+CREATE SCHEMA silver;
+GO
+CREATE SCHEMA gold;
+GO
+
+-- Creating tables for the Bronze layer with error handling --
+
+IF OBJECT_ID ('bronze.crm_cust_info','U') IS NOT NULL
+    DROP TABLE bronze.crm_cust_info;
+CREATE TABLE bronze.crm_cust_info (
+    cst_id INT,
+    cst_key NVARCHAR(50),
+    cst_firstname NVARCHAR(50),
+    cst_lastname NVARCHAR(50),
+    cst_material_status NVARCHAR(50),
+    cst_gndr NVARCHAR(50),
+    cst_create_date DATE
+);
+
+IF OBJECT_ID ('bronze.crm_prd_info','U') IS NOT NULL
+    DROP TABLE bronze.crm_prd_info;
+CREATE TABLE bronze.crm_prd_info (
+    prd_id INT,
+    prd_key NVARCHAR(50),
+    prd_nm NVARCHAR(50),
+    prd_cost INT,
+    prd_line NVARCHAR(50),
+    prd_start_dt DATETIME,
+    prd_end_dt DATETIME
+);
+
+IF OBJECT_ID ('bronze.crm_sales_details','U') IS NOT NULL
+    DROP TABLE bronze.crm_sales_details;
+CREATE TABLE bronze.crm_sales_details (
+    sls_ord_num NVARCHAR(50),
+    sls_prd_key NVARCHAR(50),
+    sls_cust_id INT,
+    sls_order_dt INT,
+    sls_ship_dt INT,
+    sls_due_dt INT,
+    sls_sales INT,
+    sls_quantity INT,
+    sls_price INT
+);
+
+if OBJECT_ID ('bronze.erp_cust_az12','U') is not null
+	drop table bronze.erp_cust_az12;
+create table bronze.erp_cust_az12
+(
+	cid nvarchar(50),
+	bdate date,
+	gen nvarchar(50)
+);
+
+if OBJECT_ID ('bronze.erp_loc_a101','U') is not null
+	drop table bronze.erp_loc_a101;
+create table bronze.erp_loc_a101
+(
+	cid nvarchar(50),
+	cntry nvarchar(50)
+);
+
+
+if OBJECT_ID ('bronze.erp_px_cat_g1v2','U') is not null
+	drop table bronze.erp_px_cat_g1v2;
+create table bronze.erp_px_cat_g1v2
+(
+	id nvarchar(50),
+	cat nvarchar(50),
+	subcat nvarchar(50),
+	maintenance nvarchar(50)
+);
+
+-- Creating stored procedure for loading data into Bronze Layer --
+
+CREATE OR ALTER PROCEDURE bronze.load_bronze AS 
+BEGIN
+    DECLARE @start_time DATETIME, @end_time DATETIME, @batchstart_time DATETIME, @batchend_time DATETIME;
+    BEGIN TRY
+        SET @batchstart_time = GETDATE();
+        PRINT 'Loading Bronze Layer tables...';
+
+        -- Update file paths before execution --
+
+        SET @start_time = GETDATE();
+        TRUNCATE TABLE bronze.crm_cust_info;
+        BULK INSERT bronze.crm_cust_info
+        FROM 'D:\sql\sql Server youtube classes\DWH-Project file\sql-data-warehouse-project\sql-data-warehouse-project\datasets\source_crm\cust_info.csv'
+        WITH (FIRSTROW = 2, FIELDTERMINATOR = ',', TABLOCK);
+        SET @end_time = GETDATE();
+        PRINT 'Customer Info Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+
+        SET @start_time = GETDATE();
+        TRUNCATE TABLE bronze.crm_prd_info;
+        BULK INSERT bronze.crm_prd_info
+        FROM 'D:\sql\sql Server youtube classes\DWH-Project file\sql-data-warehouse-project\sql-data-warehouse-project\datasets\source_crm\prd_info.csv'
+        WITH (FIRSTROW = 2, FIELDTERMINATOR = ',', TABLOCK);
+        SET @end_time = GETDATE();
+        PRINT 'Product Info Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+
+        SET @start_time = GETDATE();
+        TRUNCATE TABLE bronze.crm_sales_details;
+        BULK INSERT bronze.crm_sales_details
+        FROM 'D:\sql\sql Server youtube classes\DWH-Project file\sql-data-warehouse-project\sql-data-warehouse-project\datasets\source_crm\sales_details.csv'
+        WITH (FIRSTROW = 2, FIELDTERMINATOR = ',', TABLOCK);
+        SET @end_time = GETDATE();
+        PRINT 'Sales Info Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+
+        SET @start_time = GETDATE();
+        TRUNCATE TABLE bronze.erp_cust_az12;
+        BULK INSERT bronze.erp_cust_az12
+        FROM 'D:\sql\sql Server youtube classes\DWH-Project file\sql-data-warehouse-project\sql-data-warehouse-project\datasets\source_crm\cust_az12.csv'
+        WITH (FIRSTROW = 2, FIELDTERMINATOR = ',', TABLOCK);
+        SET @end_time = GETDATE();
+        PRINT 'customer Info Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+
+        SET @start_time = GETDATE();
+        TRUNCATE TABLE bronze.erp_loc_a101;
+        BULK INSERT bronze.erp_loc_a101
+        FROM 'D:\sql\sql Server youtube classes\DWH-Project file\sql-data-warehouse-project\sql-data-warehouse-project\datasets\source_crm\loc_a101.csv'
+        WITH (FIRSTROW = 2, FIELDTERMINATOR = ',', TABLOCK);
+        SET @end_time = GETDATE();
+        PRINT 'Location Info Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+
+        SET @start_time = GETDATE();
+        TRUNCATE TABLE bronze.erp_px_cat_g1v2;
+        BULK INSERT bronze.erp_px_cat_g1v2
+        FROM 'D:\sql\sql Server youtube classes\DWH-Project file\sql-data-warehouse-project\sql-data-warehouse-project\datasets\source_crm\px_cat_g1v2.csv'
+        WITH (FIRSTROW = 2, FIELDTERMINATOR = ',', TABLOCK);
+        SET @end_time = GETDATE();
+        PRINT 'product Info Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' seconds';
+        
+
+        SET @batchend_time = GETDATE();
+        PRINT 'Total Load Duration for Bronze Layer: ' + CAST(DATEDIFF(SECOND, @batchstart_time, @batchend_time) AS NVARCHAR) + ' seconds';
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error occurred while loading data into Bronze Layer';
+        PRINT 'Error Message: ' + ERROR_MESSAGE();
+    END CATCH
+END;
+
+-- Creating Silver layer tables with default timestamps --
+
+IF OBJECT_ID ('silver.crm_cust_info','U') IS NOT NULL
+    DROP TABLE silver.crm_cust_info;
+CREATE TABLE silver.crm_cust_info (
+    cst_id INT,
+    cst_key NVARCHAR(50),
+    cst_firstname NVARCHAR(50),
+    cst_lastname NVARCHAR(50),
+    cst_material_status NVARCHAR(50),
+    cst_gndr NVARCHAR(50),
+    cst_create_date DATE,
+    dwh_create_date DATETIME2 DEFAULT GETDATE()
+);
+
+IF OBJECT_ID ('silver.crm_prd_info','U') IS NOT NULL
+    DROP TABLE silver.crm_prd_info;
+CREATE TABLE silver.crm_prd_info (
+    prd_id int,
+	cat_id nvarchar(50),
+	prd_key nvarchar(50),
+	prd_nm nvarchar(50),
+	prd_cost int,
+	prd_line nvarchar(50),
+	prd_start_dt date,
+	prd_end_dt date,
+	dwh_create_date Datetime2 default getdate()
+);
+
+IF OBJECT_ID ('silver.crm_sales_details','U') IS NOT NULL
+    DROP TABLE silver.crm_sales_details;
+CREATE TABLE silver.crm_sales_details (
+	sls_ord_num nvarchar(50),
+	sls_prd_key nvarchar(50),
+	sls_cust_id int,
+	sls_order_dt Date,
+	sls_ship_dt date,
+	sls_due_dt date,
+	sls_sales int,
+	sls_quantity int,
+	sls_price int,
+	dwh_create_date Datetime2 default getdate()
+);
+
+IF OBJECT_ID ('silver.erp_cust_az12','U') IS NOT NULL
+    DROP TABLE silver.erp_cust_az12;
+CREATE TABLE silver.erp_cust_az12 (
+	cid nvarchar(50),
+	bdate date,
+	gen nvarchar(50),
+	dwh_create_date Datetime2 default getdate()
+);
+
+IF OBJECT_ID ('silver.erp_loc_a101','U') IS NOT NULL
+    DROP TABLE silver.erp_loc_a101;
+CREATE TABLE silver.erp_loc_a101 (
+	cid nvarchar(50),
+	cntry nvarchar(50),
+	dwh_create_date Datetime2 default getdate()
+  );
+
+IF OBJECT_ID ('silver.erp_px_cat_g1v2','U') IS NOT NULL
+    DROP TABLE silver.erp_px_cat_g1v2;
+CREATE TABLE silver.erp_px_cat_g1v2 (
+	id nvarchar(50),
+	cat nvarchar(50),
+	subcat nvarchar(50),
+	maintenance nvarchar(50),
+	dwh_create_date Datetime2 default getdate()
+  );
